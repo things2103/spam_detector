@@ -8,7 +8,6 @@ Original file is located at
 """
 
 # app.py
-!pip install streamlit nltk Sastrawi pandas joblib
 import streamlit as st
 import pandas as pd
 import joblib
