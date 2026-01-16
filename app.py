@@ -90,6 +90,16 @@ class TextPreprocessor(BaseEstimator, TransformerMixin):
 
 preprocess = TextPreprocessor(kamus_normalisasi, stopwords_all, stemmer)
 
+tfidf = TfidfVectorizer(
+    ngram_range=(1,2),
+    min_df=2,
+    max_df=0.9,
+    max_features=6000,
+    sublinear_tf=True,
+    smooth_idf=True,
+    norm='l2'
+)
+
 # =======================
 # Pilih Model
 # =======================
