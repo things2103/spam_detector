@@ -1,7 +1,13 @@
 # app.py
 import streamlit as st
+import pandas as pd
 import joblib
-import os
+import re, unicodedata
+import nltk
+from nltk.corpus import stopwords
+from sklearn.base import BaseEstimator, TransformerMixin
+from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
+from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 
 # =======================
 # Konfigurasi halaman
@@ -16,7 +22,68 @@ st.title("📧 Deteksi Email Spam")
 st.write("Pilih CV, model, masukkan teks email, lalu prediksi spam/ham.")
 
 # =======================
-# Folder model
+# Download stopwords NLTK
+# =======================
+nltk.download('stopwords')
+
+# =======================
+# Custom Preprocessing Class
+# =======================
+class TextPreprocessor(BaseEstimator, TransformerMixin):
+    def __init__(self, kamus_normalisasi=None, stopwords_all=None, stemmer=None):
+        self.kamus_normalisasi = kamus_normalisasi
+        self.stopwords_all = stopwords_all
+        self.stemmer = stemmer
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        return [self._clean_text(x) for x in X]
+
+    def _clean_text(self, text):
+        text = str(text).lower()
+        text = text.replace("\n", " ").replace("\r", " ")
+        text = re.sub(r'\b(?:https?://|www\.|http\b|https\b)\S*|\S+@\S+\b', ' ', text)
+        text = re.sub(r'\b(from|to|cc|bcc|subject|subjek|re|fw|fwd)\b', ' ', text)
+        text = re.sub(r'\b(com|net|org|id|edu|inc|co)\b', ' ', text)
+        text = re.sub(r'[_\-‐-―]+', ' ', text)
+        text = ''.join(ch for ch in text if not unicodedata.category(ch).startswith("C"))
+        text = re.sub(r'[^a-z\s]', ' ', text)
+        text = re.sub(r'(.)\1{2,}', r'\1', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        words = text.split()
+        if self.kamus_normalisasi:
+            words = [self.kamus_normalisasi.get(w, w) for w in words]
+        if self.stemmer:
+            words = [self.stemmer.stem(w) for w in words]
+        if self.stopwords_all:
+            words = [w for w in words if w not in self.stopwords_all and len(w) > 2]
+        return " ".join(words)
+
+# =======================
+# Load kamus dan stopwords
+# =======================
+stop_factory = StopWordRemoverFactory()
+stopwords_id = set(stop_factory.get_stop_words())
+stopwords_en = set(stopwords.words('english'))
+
+stemmer_factory = StemmerFactory()
+stemmer = stemmer_factory.create_stemmer()
+
+df_kamus = pd.read_csv("kamus_gaul.csv")
+kamus_normalisasi = dict(zip(df_kamus['slang'], df_kamus['formal']))
+
+additional_stopwords = {
+    "gue", "viagra", "per", "dpc", "nya", "sih",
+    "gas", "pana", "corp", "rice", "london","dear",
+    "faks", "ees", "lon", "jul","rxoo","gelling","epa"
+}
+
+stopwords_all = stopwords_id.union(stopwords_en).union(additional_stopwords)
+
+# =======================
+# Pilih CV & Model
 # =======================
 MODEL_DIR = "models/"
 
@@ -42,11 +109,7 @@ models_cv5 = {
     "Ensemble Soft Tuned": "cv5_ensemble_soft_tuned.pkl"
 }
 
-# =======================
-# Pilih CV & model
-# =======================
 cv_choice = st.selectbox("Pilih CV:", ["CV 3", "CV 5"])
-
 if cv_choice == "CV 3":
     model_name = st.selectbox("Pilih model:", list(models_cv3.keys()))
     model_file = models_cv3[model_name]
@@ -68,20 +131,16 @@ if st.button("📧 Prediksi Spam/Ham"):
         st.warning("Masukkan teks email terlebih dahulu!")
         st.stop()
 
-    model_path = os.path.join(MODEL_DIR, model_file)
-    
-    if not os.path.exists(model_path):
-        st.error(f"Model tidak ditemukan: {model_file}")
-        st.stop()
-
-    # Load pipeline lengkap (preprocess + TF-IDF + model)
+    # Load pipeline model lengkap
+    model_path = MODEL_DIR + model_file
     model = joblib.load(model_path)
 
     # Prediksi
-    predictions = model.predict([email_input.strip()])
+    texts = [email_input.strip()]
+    predictions = model.predict(texts)
     try:
-        probabilities = model.predict_proba([email_input.strip()])
-    except AttributeError:
+        probabilities = model.predict_proba(texts)
+    except:
         probabilities = None
 
     # Tampilkan hasil
@@ -90,6 +149,7 @@ if st.button("📧 Prediksi Spam/Ham"):
     st.markdown(f"**Kategori:** {predictions[0].upper()}")
 
     if probabilities is not None:
+        prob_dict = dict(zip(model.classes_, probabilities[0]))
         st.markdown("**Probabilitas:**")
-        for k, v in zip(model.classes_, probabilities[0]):
+        for k, v in prob_dict.items():
             st.write(f"{k}: {v:.2f}")
