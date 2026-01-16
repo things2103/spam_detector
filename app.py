@@ -89,8 +89,9 @@ stemmer = stemmer_factory.create_stemmer()
 
 # Kamus gaul
 # Load CSV kamus gaul
-df_kamus = pd.read_csv("kamus_gaul.csv")
+df_kamus = pd.read_csv("kamus_gaul.csv", encoding="utf-8")
 st.write("Kolom CSV kamus_gaul:", df_kamus.columns.tolist())
+st.write(df_kamus.head())
 kamus_normalisasi = dict(zip(df_kamus['slang'], df_kamus['formal']))
 kamus_normalisasi["communications"] = "komunikasi"
 kamus_normalisasi["university"] = "universitas"
