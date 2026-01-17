@@ -150,7 +150,9 @@ if st.button("📧 Prediksi Spam/Ham"):
     if not email_input.strip():
         st.warning("Masukkan teks email terlebih dahulu!")
         st.stop()
-# 3. Validasi minimal 10 kata
+
+    word_count = len(email_input.strip().split())
+
     if word_count < 10:
         st.error(
             f"Teks terlalu pendek ({word_count} kata).\n\n"
