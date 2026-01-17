@@ -150,6 +150,13 @@ if st.button("📧 Prediksi Spam/Ham"):
     if not email_input.strip():
         st.warning("Masukkan teks email terlebih dahulu!")
         st.stop()
+# 3. Validasi minimal 10 kata
+    if word_count < 10:
+        st.error(
+            f"Teks terlalu pendek ({word_count} kata).\n\n"
+            "⚠️ Minimal **10 kata** diperlukan agar prediksi valid."
+        )
+        st.stop()
 
     # Load model fit
     model_path = MODEL_DIR + model_file
